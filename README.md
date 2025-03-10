@@ -1,120 +1,109 @@
 # qrcodematching2
-qrcodematching2
+实验二维码3
+<script src="https://unpkg.com/html5-qrcode/minified/html5-qrcode.min.js"></script>
 <!DOCTYPE html>
-<html>
+<html lang="zh">
 <head>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>双二维码比对扫描器</title>
-    <script src="https://unpkg.com/@zxing/library@latest"></script>
+    <title>双二维码扫描</title>
     <style>
-        #scanner-container { 
-            position: relative;
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f7f7f7;
+        }
+        #camera {
             width: 100%;
             max-width: 600px;
-            margin: auto;
+            margin-bottom: 20px;
         }
-        #preview {
-            width: 100%;
-            height: auto;
+        #result {
+            margin-top: 20px;
+            font-size: 20px;
         }
-        .status-light {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
+        .qr-box {
+            width: 200px;
+            height: 200px;
+            border: 2px dashed #000;
+            position: relative;
+        }
+        .qr-box[data-qr-index="0"] {
+            margin-right: 20px;
+        }
+        .qr-box div {
             position: absolute;
-            top: 20px;
-            right: 20px;
-            border: 2px solid white;
-        }
-        .result-box {
-            padding: 10px;
-            margin: 10px;
-            background: rgba(255,255,255,0.9);
-            border-radius: 5px;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.5);
         }
     </style>
 </head>
 <body>
-    <div id="scanner-container">
-        <video id="preview" playsinline></video>
-        <div id="statusLight" class="status-light"></div>
-        <div id="results">
-            <div class="result-box">二维码1：<span id="result1">等待扫描...</span></div>
-            <div class="result-box">二维码2：<span id="result2">等待扫描...</span></div>
-        </div>
-    </div>
+    <div id="camera" class="qr-box" data-qr-index="0"></div>
+    <div id="camera2" class="qr-box" data-qr-index="1"></div>
+    <div id="result"></div>
 
     <script>
-        const codeReader = new ZXing.BrowserMultiFormatReader();
-        let scanning = false;
-        let lastResults = { qr1: null, qr2: null };
+        let scannedQRCode1 = null;
+        let scannedQRCode2 = null;
 
-        async function startScanning() {
-            try {
-                const videoInputDevices = await ZXing.BrowserCodeReader.listVideoInputDevices();
-                await codeReader.decodeFromVideoDevice(
-                    videoInputDevices[0].deviceId,
-                    'preview',
-                    (result, error) => {
-                        if (result) {
-                            handleResult(result.text);
-                        }
-                    }
-                );
-                scanning = true;
-            } catch (error) {
-                console.error(error);
+        const html5QrCode1 = new Html5Qrcode("camera");
+        const html5QrCode2 = new Html5Qrcode("camera2");
+
+        function onScanSuccess(qrCodeMessage, qrIndex) {
+            if (qrIndex === 0 && !scannedQRCode1) {
+                scannedQRCode1 = qrCodeMessage;
+                document.getElementById("result").innerText = `第一个二维码: ${scannedQRCode1}`;
+            } else if (qrIndex === 1 && !scannedQRCode2) {
+                scannedQRCode2 = qrCodeMessage;
+                document.getElementById("result").innerText += `\n第二个二维码: ${scannedQRCode2}`;
             }
-        }
 
-        function handleResult(text) {
-            if (!lastResults.qr1) {
-                lastResults.qr1 = text;
-                document.getElementById('result1').textContent = text;
-            } else if (!lastResults.qr2 && text !== lastResults.qr1) {
-                lastResults.qr2 = text;
-                document.getElementById('result2').textContent = text;
-                checkResults();
-            } else {
-                // 当两个二维码都扫描到后，重置检测
-                if (text === lastResults.qr1 || text === lastResults.qr2) {
-                    checkResults();
-                }
-            }
-        }
-
-        function checkResults() {
-            const statusLight = document.getElementById('statusLight');
-            if (lastResults.qr1 && lastResults.qr2) {
-                if (lastResults.qr1 === lastResults.qr2) {
-                    statusLight.style.backgroundColor = '#00ff00';
+            if (scannedQRCode1 && scannedQRCode2) {
+                // 比较两个二维码
+                if (scannedQRCode1 === scannedQRCode2) {
+                    document.getElementById("result").innerText += "\n两个二维码一致!";
                 } else {
-                    statusLight.style.backgroundColor = '#ff0000';
+                    document.getElementById("result").innerText += "\n二维码不一致!";
                 }
-            } else {
-                statusLight.style.backgroundColor = '#ff0000';
-            }
-            
-            // 2秒后重置扫描结果
-            setTimeout(() => {
-                lastResults = { qr1: null, qr2: null };
-                document.getElementById('result1').textContent = '等待扫描...';
-                document.getElementById('result2').textContent = '等待扫描...';
-                statusLight.style.backgroundColor = '';
-            }, 2000);
-        }
-
-        // 初始化摄像头
-        window.onload = () => {
-            startScanning();
-        }
-
-        // 清理摄像头
-        window.onbeforeunload = () => {
-            if (scanning) {
-                codeReader.reset();
+                // 停止扫描
+                html5QrCode1.stop();
+                html5QrCode2.stop();
             }
         }
+
+        const startScanning = () => {
+            html5QrCode1.start(
+                { facingMode: "environment" }, // 使用环境摄像头
+                {
+                    fps: 10,
+                    qrbox: { width: 200, height: 200 } // 定义二维码框的大小
+                },
+                (qrCodeMessage) => onScanSuccess(qrCodeMessage, 0) // 第一个二维码
+            ).catch(err => {
+                console.error("无法启动扫码器1.", err);
+            });
+
+            html5QrCode2.start(
+                { facingMode: "environment" },
+                {
+                    fps: 10,
+                    qrbox: { width: 200, height: 200 }
+                },
+                (qrCodeMessage) => onScanSuccess(qrCodeMessage, 1) // 第二个二维码
+            ).catch(err => {
+                console.error("无法启动扫码器2.", err);
+            });
+        };
+
+        startScanning(); // 开始扫描二维码
     </script>
 </body>
 </html>
